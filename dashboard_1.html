@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>왕홍 부트캠프 운영 대시보드</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Apple SD Gothic Neo','Noto Sans KR',sans-serif;background:#f5f6f8;color:#1a1a2e;min-height:100vh}
+.container{max-width:1100px;margin:0 auto;padding:1.5rem}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:1.25rem 0 1.25rem;border-bottom:1px solid #e2e5eb;margin-bottom:1.5rem}
+.hdr-title{font-size:18px;font-weight:700;color:#1a1a2e;letter-spacing:-0.3px}
+.hdr-sub{font-size:12px;color:#888;margin-top:3px}
+.btn{padding:7px 15px;font-size:12px;border:1px solid #d0d5dd;border-radius:8px;background:#fff;color:#333;cursor:pointer;font-family:inherit;transition:all .15s}
+.btn:hover{background:#f0f2f5;border-color:#b0b8c5}
+.btn-g{background:#1D9E75;border-color:#1D9E75;color:#fff}
+.btn-g:hover{background:#0F6E56;border-color:#0F6E56}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:1.5rem}
+.sc{background:#fff;border-radius:12px;padding:14px 16px;border:1px solid #e8eaed}
+.sc-l{font-size:11px;color:#888;margin-bottom:5px;font-weight:500;letter-spacing:0.2px}
+.sc-row{display:flex;align-items:baseline;gap:5px}
+.sc-v{font-size:24px;font-weight:700;color:#1a1a2e}
+.sc-u{font-size:13px;color:#888}
+.tabs{display:flex;gap:6px;margin-bottom:1.25rem;flex-wrap:wrap}
+.tab{padding:6px 16px;font-size:12px;border:1px solid #e2e5eb;border-radius:20px;cursor:pointer;background:#fff;color:#666;font-family:inherit;transition:all .15s;font-weight:500}
+.tab.on{background:#1D9E75;border-color:#1D9E75;color:#fff}
+.panel{border:1px solid #e8eaed;border-radius:12px;margin-bottom:1.25rem;overflow:hidden;background:#fff}
+.panel-hdr{padding:11px 16px;background:#f8f9fb;border-bottom:1px solid #e8eaed;font-size:13px;font-weight:600;color:#1a1a2e;display:flex;align-items:center;justify-content:space-between}
+.panel-body{padding:16px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{padding:8px 12px;text-align:left;font-weight:600;color:#666;font-size:11px;border-bottom:1px solid #e8eaed;white-space:nowrap;background:#fafbfc}
+tbody tr{border-bottom:1px solid #f0f2f5}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:#fafbfc}
+td{padding:8px 12px;color:#1a1a2e;white-space:nowrap}
+.badge{display:inline-flex;padding:3px 8px;border-radius:10px;font-size:10px;font-weight:600}
+.b-ok{background:#e6f7f1;color:#0a6644}
+.b-warn{background:#fff8e6;color:#7a4f00}
+.b-no{background:#fff0f0;color:#c0392b}
+.miss-chips{display:flex;flex-wrap:wrap;gap:6px;padding:12px 16px}
+.chip{padding:4px 11px;background:#fff0f0;color:#c0392b;border-radius:12px;font-size:12px;font-weight:500}
+.prog-wrap{display:flex;align-items:center;gap:8px}
+.prog-bar{flex:1;height:5px;background:#eef0f3;border-radius:3px;overflow:hidden;min-width:50px}
+.prog-fill{height:100%;border-radius:3px;transition:width .4s}
+.dot-row{display:flex;gap:3px;align-items:center}
+.dot{width:13px;height:13px;border-radius:2px;flex-shrink:0}
+.dot-fill{background:#1D9E75}
+.dot-empty{background:#eef0f3;border:1px solid #d8dce3}
+.week-sep{width:1px;height:13px;background:#d0d5dd;flex-shrink:0}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.d-card{background:#f8f9fb;border-radius:10px;padding:11px 13px;border:1px solid #e8eaed}
+.d-name{font-size:12px;font-weight:600;color:#1a1a2e;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center}
+.arrow-up{color:#1D9E75;font-weight:600}
+.chart-wrap{position:relative;width:100%;height:210px}
+.loading-box{text-align:center;padding:3rem;color:#888;font-size:13px}
+.error-box{background:#fff0f0;color:#c0392b;padding:11px 16px;border-radius:10px;font-size:12px;margin-bottom:1rem;border:1px solid #ffd5d5}
+.empty-box{background:#f8f9fb;border-radius:10px;padding:2rem;text-align:center;font-size:13px;color:#aaa;line-height:1.8}
+@media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}.detail-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="hdr">
+    <div>
+      <div class="hdr-title">왕홍 부트캠프 운영 대시보드</div>
+      <div class="hdr-sub" id="upd-label">데이터 불러오는 중...</div>
+    </div>
+    <button class="btn btn-g" onclick="loadCSV()">새로고침</button>
+  </div>
+
+  <div id="error-area"></div>
+
+  <div class="stats">
+    <div class="sc"><div class="sc-l">전체 참가자</div><div class="sc-row"><span class="sc-v">15</span><span class="sc-u">명</span></div></div>
+    <div class="sc"><div class="sc-l">이번 주 달성률</div><div class="sc-row"><span class="sc-v" id="s-week-pct" style="color:#1D9E75">-</span><span class="sc-u">%</span></div></div>
+    <div class="sc"><div class="sc-l">이번 주 업로드 미완료</div><div class="sc-row"><span class="sc-v" id="s-miss" style="color:#e74c3c">-</span><span class="sc-u">명</span></div></div>
+    <div class="sc"><div class="sc-l">전체 달성률</div><div class="sc-row"><span class="sc-v" id="s-total-pct">-</span><span class="sc-u">%</span></div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" onclick="setTab('overview',this)">전체 현황</button>
+    <button class="tab" onclick="setTab('personal',this)">개인별 현황</button>
+    <button class="tab" onclick="setTab('stats',this)">성장 지표</button>
+  </div>
+
+  <div id="tab-overview"><div class="loading-box">데이터 불러오는 중...</div></div>
+  <div id="tab-personal" style="display:none"></div>
+  <div id="tab-stats" style="display:none"></div>
+</div>
+
+<script>
+const CSV_URL="https://docs.google.com/spreadsheets/d/e/2PACX-1vS3jWElr8lD4_k6g11JsiQvUsHeijeDJ2EqPBqvA7nVuRt8BnYiTNRHvGpWbEK0M9K3O6rI1VKHBARA/pub?gid=497430891&single=true&output=csv";
+const WEEKS=[{label:"1주차",dates:"4/6~12"},{label:"2주차",dates:"4/13~19"},{label:"3주차",dates:"4/20~26"},{label:"4주차",dates:"4/27~5/3"}];
+const PPW=5,CUR_WEEK=0;
+let DATA=[];
+
+function parseCSV(text){
+  const lines=text.trim().split('\n');
+  const headers=lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));
+  return lines.slice(1).map(line=>{
+    const vals=line.split(',').map(v=>v.trim().replace(/^"|"$/g,''));
+    const obj={};headers.forEach((h,i)=>{obj[h]=vals[i]||'';});
+    return{
+      name:obj['이름']||'',
+      startFollower:obj['시작_팔로워']?parseInt(obj['시작_팔로워']):null,
+      weeks:[1,2,3,4].map(w=>({
+        uploads:obj[`${w}주차_업로드수`]?parseInt(obj[`${w}주차_업로드수`]):null,
+        views:obj[`${w}주차_조회수합계`]?parseInt(obj[`${w}주차_조회수합계`]):null,
+        likes:obj[`${w}주차_좋아요합계`]?parseInt(obj[`${w}주차_좋아요합계`]):null,
+        saves:obj[`${w}주차_저장합계`]?parseInt(obj[`${w}주차_저장합계`]):null,
+        comments:obj[`${w}주차_댓글합계`]?parseInt(obj[`${w}주차_댓글합계`]):null,
+        follower:obj[`${w}주차_팔로워`]?parseInt(obj[`${w}주차_팔로워`]):null,
+      }))
+    };
+  }).filter(p=>p.name);
+}
+
+function totalDone(p){return p.weeks.reduce((s,w)=>s+(w.uploads===null?0:w.uploads),0);}
+function totalPct(p){return Math.round(totalDone(p)/20*100);}
+function weekBadgeClass(v){if(v===null)return'b-no';if(v>=PPW)return'b-ok';if(v>=3)return'b-warn';return'b-no';}
+function weekBadgeText(v){if(v===null)return'업로드 미완료';return`✓ ${v}개`;}
+
+function calcStats(){
+  const total=DATA.length||15;
+  const weekDone=DATA.filter(p=>p.weeks[CUR_WEEK].uploads===PPW).length;
+  document.getElementById('s-week-pct').textContent=Math.round(weekDone/total*100);
+  document.getElementById('s-miss').textContent=total-weekDone;
+  const allDone=DATA.reduce((s,p)=>s+totalDone(p),0);
+  document.getElementById('s-total-pct').textContent=Math.round(allDone/(total*20)*100);
+}
+
+function renderOverview(){
+  const missNames=DATA.filter(p=>p.weeks[CUR_WEEK].uploads!==PPW).map(p=>p.name);
+  let html='';
+  if(missNames.length){
+    html+=`<div class="panel"><div class="panel-hdr" style="color:#c0392b">⚠ ${WEEKS[CUR_WEEK].label} 업로드 미완료 참가자 (${missNames.length}명)</div><div class="miss-chips">`;
+    missNames.forEach(n=>{html+=`<span class="chip">${n}</span>`;});
+    html+='</div></div>';
+  }else{
+    html+=`<div class="panel"><div class="panel-hdr" style="color:#0a6644">✓ ${WEEKS[CUR_WEEK].label} 전원 업로드 완료!</div></div>`;
+  }
+  const sorted=[...DATA].sort((a,b)=>totalDone(b)-totalDone(a));
+  html+=`<div class="panel"><div class="panel-hdr"><span>참가자별 전체 진행 현황</span><span style="font-size:11px;font-weight:400;color:#888">달성률 높은 순</span></div><div class="panel-body" style="padding:0">`;
+  html+=`<table><thead><tr><th>이름</th><th style="min-width:110px">전체 달성률</th><th>업로드</th>`;
+  WEEKS.forEach(w=>{html+=`<th>${w.label}<br><span style="font-size:10px;font-weight:400;color:#aaa">${w.dates}</span></th>`;});
+  html+='</tr></thead><tbody>';
+  sorted.forEach(p=>{
+    const done=totalDone(p),pc=totalPct(p);
+    const c=pc>=75?'#1D9E75':pc>=40?'#f39c12':'#e74c3c';
+    html+=`<tr><td style="font-weight:600">${p.name}</td>
+    <td><div class="prog-wrap"><div class="prog-bar"><div class="prog-fill" style="width:${pc}%;background:${c}"></div></div><span style="font-size:11px;color:#888;min-width:26px">${pc}%</span></div></td>
+    <td><span style="font-weight:600;color:${c};font-size:12px">${done}/20</span></td>`;
+    p.weeks.forEach(w=>{html+=`<td><span class="badge ${weekBadgeClass(w.uploads)}">${weekBadgeText(w.uploads)}</span></td>`;});
+    html+='</tr>';
+  });
+  html+='</tbody></table></div></div>';
+  html+=`<div class="panel"><div class="panel-hdr">주차별 입력 현황 요약</div><div class="panel-body" style="padding:0"><table><thead><tr><th>주차</th><th>기간</th><th>완료 (5개)</th><th>미완료</th><th>완료율</th></tr></thead><tbody>`;
+  WEEKS.forEach((w,wi)=>{
+    const done=DATA.filter(p=>p.weeks[wi].uploads===PPW).length;
+    const total=DATA.length||15,miss=total-done,pc=Math.round(done/total*100);
+    const c=pc>=75?'#1D9E75':pc>=50?'#f39c12':'#e74c3c';
+    html+=`<tr><td style="font-weight:600">${w.label}</td><td style="color:#888">${w.dates}</td>
+    <td><span style="color:#0a6644;font-weight:600">${done}명</span></td>
+    <td>${miss>0?`<span style="color:#c0392b;font-weight:600">${miss}명</span>`:`<span style="color:#0a6644">없음</span>`}</td>
+    <td><span style="color:${c};font-weight:600">${pc}%</span></td></tr>`;
+  });
+  html+='</tbody></table></div></div>';
+  document.getElementById('tab-overview').innerHTML=html;
+}
+
+function renderPersonal(){
+  if(!DATA.length){document.getElementById('tab-personal').innerHTML='<div class="empty-box">데이터가 없습니다</div>';return;}
+  let html=`<div class="detail-grid">`;
+  DATA.forEach(p=>{
+    const done=totalDone(p),pc=totalPct(p);
+    const color=pc>=75?'#1D9E75':pc>=40?'#f39c12':'#e74c3c';
+    const fl0=p.startFollower;
+    const flL=[...p.weeks].reverse().find(w=>w.follower!==null)?.follower??null;
+    const flArrow=(fl0!==null&&flL!==null&&flL!==fl0)
+      ?`<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px"><span style="color:#aaa">${fl0}</span><span style="color:#aaa">→</span><span class="arrow-up">${flL}</span></span>`
+      :(fl0!==null?`<span style="font-size:11px;color:#aaa">${fl0}</span>`:`<span style="font-size:11px;color:#ccc">-</span>`);
+    const lk0=p.weeks[0].likes,sv0=p.weeks[0].saves;
+    const lkL=[...p.weeks].reverse().find(w=>w.likes!==null)?.likes??null;
+    const svL=[...p.weeks].reverse().find(w=>w.saves!==null)?.saves??null;
+    const eng0=(lk0!==null&&sv0!==null)?lk0+sv0:null;
+    const engL=(lkL!==null&&svL!==null)?lkL+svL:null;
+    const engArrow=(eng0!==null&&engL!==null&&engL!==eng0)
+      ?`<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px"><span style="color:#aaa">${eng0}</span><span style="color:#aaa">→</span><span class="arrow-up">${engL}</span></span>`
+      :(eng0!==null?`<span style="font-size:11px;color:#aaa">${eng0}</span>`:`<span style="font-size:11px;color:#ccc">-</span>`);
+    html+=`<div class="d-card">
+      <div class="d-name"><span>${p.name}</span><span style="color:${color};font-size:11px;font-weight:600">${done}/20개</span></div>
+      <div style="height:4px;background:#eef0f3;border-radius:2px;margin-bottom:8px"><div style="height:100%;width:${pc}%;background:${color};border-radius:2px"></div></div>
+      <div class="dot-row" style="margin-bottom:8px">`;
+    p.weeks.forEach((w,wi)=>{
+      if(wi>0)html+=`<div class="week-sep"></div>`;
+      for(let d=0;d<PPW;d++){html+=`<div class="dot ${(w.uploads!==null&&d<w.uploads)?'dot-fill':'dot-empty'}"></div>`;}
+    });
+    html+=`</div><div style="display:flex;gap:12px;font-size:11px;color:#888">
+      <span>팔로워 ${flArrow}</span><span>좋아요+저장 ${engArrow}</span>
+    </div></div>`;
+  });
+  html+='</div>';
+  document.getElementById('tab-personal').innerHTML=html;
+}
+
+let chartObjs=[];
+function renderStats(){
+  const colors=['#1D9E75','#3266ad','#EF9F27','#E24B4A','#7F77DD','#D85A30','#D4537E','#639922','#BA7517','#0F6E56','#185FA5','#993556','#3B6D11','#854F0B','#533AAA'];
+  const wLabels=WEEKS.map(w=>w.label);
+  const active=DATA.filter(p=>p.weeks.some(w=>w.uploads!==null));
+  if(!active.length){
+    document.getElementById('tab-stats').innerHTML='<div class="empty-box">아직 입력된 데이터가 없어요.<br>운영진이 (대시보드DB) 탭에 데이터를 입력하면 차트가 표시됩니다.</div>';
+    return;
+  }
+  let html=`<div class="panel"><div class="panel-hdr">조회수 추이 (주차별)</div><div class="panel-body"><div class="chart-wrap"><canvas id="c-views"></canvas></div></div></div>`;
+  html+=`<div class="panel"><div class="panel-hdr">팔로워 성장 추이 (주차별)</div><div class="panel-body"><div class="chart-wrap"><canvas id="c-follower"></canvas></div></div></div>`;
+  html+=`<div class="panel"><div class="panel-hdr">좋아요/저장 추이 (주차별)</div><div class="panel-body"><div class="chart-wrap"><canvas id="c-like"></canvas></div></div></div>`;
+  document.getElementById('tab-stats').innerHTML=html;
+  chartObjs.forEach(c=>{try{c.destroy()}catch(e){}});chartObjs=[];
+  setTimeout(()=>{
+    const mkDs=key=>active.map((p,ci)=>({label:p.name,tension:0.3,pointRadius:4,spanGaps:false,borderColor:colors[ci%colors.length],backgroundColor:colors[ci%colors.length]+'22',data:p.weeks.map(w=>w[key])}));
+    chartObjs.push(new Chart(document.getElementById('c-views'),{type:'line',data:{labels:wLabels,datasets:mkDs('views')},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{font:{size:10}}},x:{ticks:{font:{size:11}}}}}}));
+    chartObjs.push(new Chart(document.getElementById('c-follower'),{type:'line',data:{labels:['시작',...wLabels],datasets:active.map((p,ci)=>({label:p.name,tension:0.3,pointRadius:4,spanGaps:false,borderColor:colors[ci%colors.length],backgroundColor:colors[ci%colors.length]+'22',data:[p.startFollower,...p.weeks.map(w=>w.follower)]}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{font:{size:10}}},x:{ticks:{font:{size:11}}}}}}));
+    const likeDs=active.map((p,ci)=>({label:p.name+' 좋아요',tension:0.3,pointRadius:3,spanGaps:false,borderColor:colors[ci%colors.length],borderDash:[],backgroundColor:'transparent',data:p.weeks.map(w=>w.likes)}));
+    const saveDs=active.map((p,ci)=>({label:p.name+' 저장',tension:0.3,pointRadius:3,spanGaps:false,borderColor:colors[ci%colors.length],borderDash:[4,3],backgroundColor:'transparent',data:p.weeks.map(w=>w.saves)}));
+    chartObjs.push(new Chart(document.getElementById('c-like'),{type:'line',data:{labels:wLabels,datasets:[...likeDs,...saveDs]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{font:{size:10}}},x:{ticks:{font:{size:11}}}}}}));
+  },100);
+}
+
+function setTab(t,el){
+  ['overview','personal','stats'].forEach(id=>{document.getElementById('tab-'+id).style.display='none';});
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('tab-'+t).style.display='';
+  if(t==='stats')renderStats();
+}
+
+function loadCSV(){
+  document.getElementById('upd-label').textContent='데이터 불러오는 중...';
+  document.getElementById('error-area').innerHTML='';
+  fetch(CSV_URL)
+    .then(r=>r.text())
+    .then(csv=>{
+      DATA=parseCSV(csv);
+      calcStats();renderOverview();renderPersonal();
+      const cur=document.querySelector('.tab.on');
+      if(cur&&cur.textContent.includes('성장'))renderStats();
+      document.getElementById('upd-label').textContent='마지막 업데이트: '+new Date().toLocaleTimeString('ko-KR')+' · Google Sheets 연동';
+    })
+    .catch(e=>{
+      document.getElementById('error-area').innerHTML=`<div class="error-box">데이터를 불러오지 못했습니다. 잠시 후 새로고침해주세요.</div>`;
+      document.getElementById('upd-label').textContent='연결 실패';
+    });
+}
+
+loadCSV();
+</script>
+</body>
+</html>

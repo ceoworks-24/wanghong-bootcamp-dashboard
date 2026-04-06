@@ -72,7 +72,7 @@ td{padding:8px 12px;color:#1a1a2e;white-space:nowrap}
   <div id="error-area"></div>
 
   <div class="stats">
-    <div class="sc"><div class="sc-l">전체 참가자</div><div class="sc-row"><span class="sc-v">15</span><span class="sc-u">명</span></div></div>
+    <div class="sc"><div class="sc-l">전체 참가자</div><div class="sc-row"><span class="sc-v" id="s-total">-</span><span class="sc-u">명</span></div></div>
     <div class="sc"><div class="sc-l">이번 주 달성률</div><div class="sc-row"><span class="sc-v" id="s-week-pct" style="color:#1D9E75">-</span><span class="sc-u">%</span></div></div>
     <div class="sc"><div class="sc-l">이번 주 업로드 미완료</div><div class="sc-row"><span class="sc-v" id="s-miss" style="color:#e74c3c">-</span><span class="sc-u">명</span></div></div>
     <div class="sc"><div class="sc-l">전체 달성률</div><div class="sc-row"><span class="sc-v" id="s-total-pct">-</span><span class="sc-u">%</span></div></div>
@@ -92,47 +92,100 @@ td{padding:8px 12px;color:#1a1a2e;white-space:nowrap}
 <script>
 const CSV_URL="https://docs.google.com/spreadsheets/d/e/2PACX-1vS3jWElr8lD4_k6g11JsiQvUsHeijeDJ2EqPBqvA7nVuRt8BnYiTNRHvGpWbEK0M9K3O6rI1VKHBARA/pub?gid=497430891&single=true&output=csv";
 const WEEKS=[{label:"1주차",dates:"4/6~12"},{label:"2주차",dates:"4/13~19"},{label:"3주차",dates:"4/20~26"},{label:"4주차",dates:"4/27~5/3"}];
-const PPW=5,CUR_WEEK=0;
+const PPW=5, CUR_WEEK=0;
 let DATA=[];
+
+// ── CSV 파싱 ──────────────────────────────────────────────
+// 쉼표가 포함된 셀(따옴표로 묶인)을 올바르게 처리하는 파서
+function parseCSVLine(line){
+  const result=[];
+  let cur='', inQ=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'){inQ=!inQ;}
+    else if(c===','&&!inQ){result.push(cur.trim());cur='';}
+    else{cur+=c;}
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+// null vs 0 구분: 셀이 빈 문자열이면 null, 숫자면 그 값(0 포함)
+function toNum(v){
+  if(v===undefined||v===null||v.trim()==='')return null;
+  const n=parseInt(v);
+  return isNaN(n)?null:n;
+}
 
 function parseCSV(text){
   const lines=text.trim().split('\n');
-  const headers=lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));
+  // 헤더 행
+  const headers=parseCSVLine(lines[0]).map(h=>h.replace(/^"|"$/g,''));
+
   return lines.slice(1).map(line=>{
-    const vals=line.split(',').map(v=>v.trim().replace(/^"|"$/g,''));
-    const obj={};headers.forEach((h,i)=>{obj[h]=vals[i]||'';});
+    if(!line.trim())return null;
+    const vals=parseCSVLine(line).map(v=>v.replace(/^"|"$/g,''));
+    const obj={};
+    headers.forEach((h,i)=>{obj[h]=vals[i]!==undefined?vals[i]:'';});
+
+    const name=obj['이름']||'';
+    if(!name)return null;
+
     return{
-      name:obj['이름']||'',
-      startFollower:obj['시작_팔로워']?parseInt(obj['시작_팔로워']):null,
+      name,
+      startFollower: toNum(obj['시작_팔로워']),
       weeks:[1,2,3,4].map(w=>({
-        uploads:obj[`${w}주차_업로드수`]?parseInt(obj[`${w}주차_업로드수`]):null,
-        views:obj[`${w}주차_조회수합계`]?parseInt(obj[`${w}주차_조회수합계`]):null,
-        likes:obj[`${w}주차_좋아요합계`]?parseInt(obj[`${w}주차_좋아요합계`]):null,
-        saves:obj[`${w}주차_저장합계`]?parseInt(obj[`${w}주차_저장합계`]):null,
-        comments:obj[`${w}주차_댓글합계`]?parseInt(obj[`${w}주차_댓글합계`]):null,
-        follower:obj[`${w}주차_팔로워`]?parseInt(obj[`${w}주차_팔로워`]):null,
+        uploads: toNum(obj[`${w}주차_업로드수`]),
+        views:   toNum(obj[`${w}주차_조회수합계`]),
+        likes:   toNum(obj[`${w}주차_좋아요합계`]),
+        saves:   toNum(obj[`${w}주차_저장합계`]),
+        comments:toNum(obj[`${w}주차_댓글합계`]),
+        follower:toNum(obj[`${w}주차_팔로워`]),
       }))
     };
-  }).filter(p=>p.name);
+  }).filter(Boolean); // null 제거 → 최인영 포함 전원 처리
 }
 
-function totalDone(p){return p.weeks.reduce((s,w)=>s+(w.uploads===null?0:w.uploads),0);}
+// ── 집계 헬퍼 ─────────────────────────────────────────────
+function totalDone(p){
+  return p.weeks.reduce((s,w)=>s+(w.uploads===null?0:w.uploads),0);
+}
 function totalPct(p){return Math.round(totalDone(p)/20*100);}
-function weekBadgeClass(v){if(v===null)return'b-no';if(v>=PPW)return'b-ok';if(v>=3)return'b-warn';return'b-no';}
-function weekBadgeText(v){if(v===null)return'업로드 미완료';return`✓ ${v}개`;}
 
+// 이번 주 업로드: null(미입력)도 미완료로 처리
+function curWeekDone(p){
+  const u=p.weeks[CUR_WEEK].uploads;
+  return u!==null && u>=PPW;
+}
+
+function weekBadgeClass(v){
+  if(v===null)return'b-no';
+  if(v>=PPW)return'b-ok';
+  if(v>=3)return'b-warn';
+  return'b-no';
+}
+function weekBadgeText(v){
+  if(v===null)return'미입력';
+  return`✓ ${v}개`;
+}
+
+// ── 상단 통계 ─────────────────────────────────────────────
 function calcStats(){
-  const total=DATA.length||15;
-  const weekDone=DATA.filter(p=>p.weeks[CUR_WEEK].uploads===PPW).length;
-  document.getElementById('s-week-pct').textContent=Math.round(weekDone/total*100);
+  const total=DATA.length;
+  document.getElementById('s-total').textContent=total;
+  const weekDone=DATA.filter(p=>curWeekDone(p)).length;
+  document.getElementById('s-week-pct').textContent=total?Math.round(weekDone/total*100):0;
   document.getElementById('s-miss').textContent=total-weekDone;
   const allDone=DATA.reduce((s,p)=>s+totalDone(p),0);
-  document.getElementById('s-total-pct').textContent=Math.round(allDone/(total*20)*100);
+  document.getElementById('s-total-pct').textContent=total?Math.round(allDone/(total*20)*100):0;
 }
 
+// ── 전체 현황 탭 ──────────────────────────────────────────
 function renderOverview(){
-  const missNames=DATA.filter(p=>p.weeks[CUR_WEEK].uploads!==PPW).map(p=>p.name);
+  const missNames=DATA.filter(p=>!curWeekDone(p)).map(p=>p.name);
   let html='';
+
+  // 미완료 칩
   if(missNames.length){
     html+=`<div class="panel"><div class="panel-hdr" style="color:#c0392b">⚠ ${WEEKS[CUR_WEEK].label} 업로드 미완료 참가자 (${missNames.length}명)</div><div class="miss-chips">`;
     missNames.forEach(n=>{html+=`<span class="chip">${n}</span>`;});
@@ -140,13 +193,16 @@ function renderOverview(){
   }else{
     html+=`<div class="panel"><div class="panel-hdr" style="color:#0a6644">✓ ${WEEKS[CUR_WEEK].label} 전원 업로드 완료!</div></div>`;
   }
+
+  // 달성률 높은 순 정렬
   const sorted=[...DATA].sort((a,b)=>totalDone(b)-totalDone(a));
+
   html+=`<div class="panel"><div class="panel-hdr"><span>참가자별 전체 진행 현황</span><span style="font-size:11px;font-weight:400;color:#888">달성률 높은 순</span></div><div class="panel-body" style="padding:0">`;
   html+=`<table><thead><tr><th>이름</th><th style="min-width:110px">전체 달성률</th><th>업로드</th>`;
   WEEKS.forEach(w=>{html+=`<th>${w.label}<br><span style="font-size:10px;font-weight:400;color:#aaa">${w.dates}</span></th>`;});
   html+='</tr></thead><tbody>';
   sorted.forEach(p=>{
-    const done=totalDone(p),pc=totalPct(p);
+    const done=totalDone(p), pc=totalPct(p);
     const c=pc>=75?'#1D9E75':pc>=40?'#f39c12':'#e74c3c';
     html+=`<tr><td style="font-weight:600">${p.name}</td>
     <td><div class="prog-wrap"><div class="prog-bar"><div class="prog-fill" style="width:${pc}%;background:${c}"></div></div><span style="font-size:11px;color:#888;min-width:26px">${pc}%</span></div></td>
@@ -155,10 +211,13 @@ function renderOverview(){
     html+='</tr>';
   });
   html+='</tbody></table></div></div>';
+
+  // 주차별 요약
   html+=`<div class="panel"><div class="panel-hdr">주차별 입력 현황 요약</div><div class="panel-body" style="padding:0"><table><thead><tr><th>주차</th><th>기간</th><th>완료 (5개)</th><th>미완료</th><th>완료율</th></tr></thead><tbody>`;
   WEEKS.forEach((w,wi)=>{
     const done=DATA.filter(p=>p.weeks[wi].uploads===PPW).length;
-    const total=DATA.length||15,miss=total-done,pc=Math.round(done/total*100);
+    const total=DATA.length, miss=total-done;
+    const pc=total?Math.round(done/total*100):0;
     const c=pc>=75?'#1D9E75':pc>=50?'#f39c12':'#e74c3c';
     html+=`<tr><td style="font-weight:600">${w.label}</td><td style="color:#888">${w.dates}</td>
     <td><span style="color:#0a6644;font-weight:600">${done}명</span></td>
@@ -169,87 +228,214 @@ function renderOverview(){
   document.getElementById('tab-overview').innerHTML=html;
 }
 
+// ── 개인별 현황 탭 ────────────────────────────────────────
+// [버그1 수정] 업로드 횟수 많은 순 정렬
+// [버그2 수정] 팔로워/좋아요+저장 처음→최신 올바르게 표시
 function renderPersonal(){
   if(!DATA.length){document.getElementById('tab-personal').innerHTML='<div class="empty-box">데이터가 없습니다</div>';return;}
+
+  // 업로드 많은 순으로 정렬
+  const sorted=[...DATA].sort((a,b)=>totalDone(b)-totalDone(a));
+
   let html=`<div class="detail-grid">`;
-  DATA.forEach(p=>{
-    const done=totalDone(p),pc=totalPct(p);
+  sorted.forEach(p=>{
+    const done=totalDone(p), pc=totalPct(p);
     const color=pc>=75?'#1D9E75':pc>=40?'#f39c12':'#e74c3c';
+
+    // ── 팔로워: 시작값 → 가장 최근에 입력된 주차값
     const fl0=p.startFollower;
-    const flL=[...p.weeks].reverse().find(w=>w.follower!==null)?.follower??null;
-    const flArrow=(fl0!==null&&flL!==null&&flL!==fl0)
-      ?`<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px"><span style="color:#aaa">${fl0}</span><span style="color:#aaa">→</span><span class="arrow-up">${flL}</span></span>`
-      :(fl0!==null?`<span style="font-size:11px;color:#aaa">${fl0}</span>`:`<span style="font-size:11px;color:#ccc">-</span>`);
-    const lk0=p.weeks[0].likes,sv0=p.weeks[0].saves;
-    const lkL=[...p.weeks].reverse().find(w=>w.likes!==null)?.likes??null;
-    const svL=[...p.weeks].reverse().find(w=>w.saves!==null)?.saves??null;
-    const eng0=(lk0!==null&&sv0!==null)?lk0+sv0:null;
-    const engL=(lkL!==null&&svL!==null)?lkL+svL:null;
-    const engArrow=(eng0!==null&&engL!==null&&engL!==eng0)
-      ?`<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px"><span style="color:#aaa">${eng0}</span><span style="color:#aaa">→</span><span class="arrow-up">${engL}</span></span>`
-      :(eng0!==null?`<span style="font-size:11px;color:#aaa">${eng0}</span>`:`<span style="font-size:11px;color:#ccc">-</span>`);
+    const flLatest=p.weeks.slice().reverse().find(w=>w.follower!==null)?.follower??null;
+
+    let flHtml;
+    if(fl0!==null && flLatest!==null){
+      const flColor=flLatest>fl0?'#1D9E75':flLatest<fl0?'#e74c3c':'#888';
+      flHtml=`<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px">
+        <span style="color:#aaa">${fl0}</span>
+        <span style="color:#aaa">→</span>
+        <span style="color:${flColor};font-weight:600">${flLatest}</span>
+      </span>`;
+    } else if(fl0!==null){
+      flHtml=`<span style="font-size:11px;color:#aaa">${fl0}</span>`;
+    } else {
+      flHtml=`<span style="font-size:11px;color:#ccc">-</span>`;
+    }
+
+    // ── 좋아요+저장 합계: 1주차 합계 → 가장 최근 주차 합계
+    // 1주차 합계 (처음 기준)
+    const lk0=p.weeks[0].likes, sv0=p.weeks[0].saves;
+    const eng0=(lk0!==null && sv0!==null) ? lk0+sv0 : (lk0!==null?lk0:(sv0!==null?sv0:null));
+
+    // 최신 주차 합계
+    let engLatest=null;
+    for(let i=p.weeks.length-1;i>=0;i--){
+      const lk=p.weeks[i].likes, sv=p.weeks[i].saves;
+      if(lk!==null || sv!==null){
+        engLatest=(lk||0)+(sv||0);
+        break;
+      }
+    }
+
+    let engHtml;
+    if(eng0!==null && engLatest!==null && engLatest!==eng0){
+      const eColor=engLatest>eng0?'#1D9E75':engLatest<eng0?'#e74c3c':'#888';
+      engHtml=`<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px">
+        <span style="color:#aaa">${eng0}</span>
+        <span style="color:#aaa">→</span>
+        <span style="color:${eColor};font-weight:600">${engLatest}</span>
+      </span>`;
+    } else if(eng0!==null){
+      engHtml=`<span style="font-size:11px;color:#aaa">${eng0}</span>`;
+    } else {
+      engHtml=`<span style="font-size:11px;color:#ccc">-</span>`;
+    }
+
     html+=`<div class="d-card">
       <div class="d-name"><span>${p.name}</span><span style="color:${color};font-size:11px;font-weight:600">${done}/20개</span></div>
       <div style="height:4px;background:#eef0f3;border-radius:2px;margin-bottom:8px"><div style="height:100%;width:${pc}%;background:${color};border-radius:2px"></div></div>
       <div class="dot-row" style="margin-bottom:8px">`;
     p.weeks.forEach((w,wi)=>{
       if(wi>0)html+=`<div class="week-sep"></div>`;
-      for(let d=0;d<PPW;d++){html+=`<div class="dot ${(w.uploads!==null&&d<w.uploads)?'dot-fill':'dot-empty'}"></div>`;}
+      for(let d=0;d<PPW;d++){
+        html+=`<div class="dot ${(w.uploads!==null&&d<w.uploads)?'dot-fill':'dot-empty'}"></div>`;
+      }
     });
-    html+=`</div><div style="display:flex;gap:12px;font-size:11px;color:#888">
-      <span>팔로워 ${flArrow}</span><span>좋아요+저장 ${engArrow}</span>
-    </div></div>`;
+    html+=`</div>
+      <div style="display:flex;gap:12px;font-size:11px;color:#888">
+        <span>팔로워 ${flHtml}</span>
+        <span>좋아요+저장 ${engHtml}</span>
+      </div>
+    </div>`;
   });
   html+='</div>';
   document.getElementById('tab-personal').innerHTML=html;
 }
 
+// ── 성장 지표 탭 ──────────────────────────────────────────
+// [버그3 수정] 좋아요+저장 합계 단일 선으로 표시
 let chartObjs=[];
 function renderStats(){
-  const colors=['#1D9E75','#3266ad','#EF9F27','#E24B4A','#7F77DD','#D85A30','#D4537E','#639922','#BA7517','#0F6E56','#185FA5','#993556','#3B6D11','#854F0B','#533AAA'];
+  const colors=['#1D9E75','#3266ad','#EF9F27','#E24B4A','#7F77DD','#D85A30','#D4537E','#639922','#BA7517','#0F6E56','#185FA5','#993556','#3B6D11','#854F0B','#533AAA','#2E86AB'];
   const wLabels=WEEKS.map(w=>w.label);
   const active=DATA.filter(p=>p.weeks.some(w=>w.uploads!==null));
+
   if(!active.length){
     document.getElementById('tab-stats').innerHTML='<div class="empty-box">아직 입력된 데이터가 없어요.<br>운영진이 (대시보드DB) 탭에 데이터를 입력하면 차트가 표시됩니다.</div>';
     return;
   }
+
   let html=`<div class="panel"><div class="panel-hdr">조회수 추이 (주차별)</div><div class="panel-body"><div class="chart-wrap"><canvas id="c-views"></canvas></div></div></div>`;
   html+=`<div class="panel"><div class="panel-hdr">팔로워 성장 추이 (주차별)</div><div class="panel-body"><div class="chart-wrap"><canvas id="c-follower"></canvas></div></div></div>`;
-  html+=`<div class="panel"><div class="panel-hdr">좋아요/저장 추이 (주차별)</div><div class="panel-body"><div class="chart-wrap"><canvas id="c-like"></canvas></div></div></div>`;
+  // [수정] 제목 변경: 좋아요+저장 합계 추이
+  html+=`<div class="panel"><div class="panel-hdr">좋아요+저장 합계 추이 (주차별)</div><div class="panel-body"><div class="chart-wrap"><canvas id="c-eng"></canvas></div></div></div>`;
   document.getElementById('tab-stats').innerHTML=html;
-  chartObjs.forEach(c=>{try{c.destroy()}catch(e){}});chartObjs=[];
+
+  chartObjs.forEach(c=>{try{c.destroy()}catch(e){}});
+  chartObjs=[];
+
   setTimeout(()=>{
-    const mkDs=key=>active.map((p,ci)=>({label:p.name,tension:0.3,pointRadius:4,spanGaps:false,borderColor:colors[ci%colors.length],backgroundColor:colors[ci%colors.length]+'22',data:p.weeks.map(w=>w[key])}));
-    chartObjs.push(new Chart(document.getElementById('c-views'),{type:'line',data:{labels:wLabels,datasets:mkDs('views')},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{font:{size:10}}},x:{ticks:{font:{size:11}}}}}}));
-    chartObjs.push(new Chart(document.getElementById('c-follower'),{type:'line',data:{labels:['시작',...wLabels],datasets:active.map((p,ci)=>({label:p.name,tension:0.3,pointRadius:4,spanGaps:false,borderColor:colors[ci%colors.length],backgroundColor:colors[ci%colors.length]+'22',data:[p.startFollower,...p.weeks.map(w=>w.follower)]}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{font:{size:10}}},x:{ticks:{font:{size:11}}}}}}));
-    const likeDs=active.map((p,ci)=>({label:p.name+' 좋아요',tension:0.3,pointRadius:3,spanGaps:false,borderColor:colors[ci%colors.length],borderDash:[],backgroundColor:'transparent',data:p.weeks.map(w=>w.likes)}));
-    const saveDs=active.map((p,ci)=>({label:p.name+' 저장',tension:0.3,pointRadius:3,spanGaps:false,borderColor:colors[ci%colors.length],borderDash:[4,3],backgroundColor:'transparent',data:p.weeks.map(w=>w.saves)}));
-    chartObjs.push(new Chart(document.getElementById('c-like'),{type:'line',data:{labels:wLabels,datasets:[...likeDs,...saveDs]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{font:{size:10}}},x:{ticks:{font:{size:11}}}}}}));
+    const mkDs=key=>active.map((p,ci)=>({
+      label:p.name,
+      tension:0.3,
+      pointRadius:4,
+      spanGaps:false,
+      borderColor:colors[ci%colors.length],
+      backgroundColor:colors[ci%colors.length]+'22',
+      data:p.weeks.map(w=>w[key])
+    }));
+
+    const chartOpts={
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        y:{beginAtZero:true,ticks:{font:{size:10}}},
+        x:{ticks:{font:{size:11}}}
+      }
+    };
+
+    // 조회수
+    chartObjs.push(new Chart(document.getElementById('c-views'),{
+      type:'line',
+      data:{labels:wLabels,datasets:mkDs('views')},
+      options:chartOpts
+    }));
+
+    // 팔로워 (시작 + 4주차)
+    chartObjs.push(new Chart(document.getElementById('c-follower'),{
+      type:'line',
+      data:{
+        labels:['시작',...wLabels],
+        datasets:active.map((p,ci)=>({
+          label:p.name,
+          tension:0.3,
+          pointRadius:4,
+          spanGaps:false,
+          borderColor:colors[ci%colors.length],
+          backgroundColor:colors[ci%colors.length]+'22',
+          data:[p.startFollower,...p.weeks.map(w=>w.follower)]
+        }))
+      },
+      options:chartOpts
+    }));
+
+    // [버그 수정] 좋아요+저장 합계를 하나의 선으로 표시
+    chartObjs.push(new Chart(document.getElementById('c-eng'),{
+      type:'line',
+      data:{
+        labels:wLabels,
+        datasets:active.map((p,ci)=>({
+          label:p.name,
+          tension:0.3,
+          pointRadius:4,
+          spanGaps:false,
+          borderColor:colors[ci%colors.length],
+          backgroundColor:colors[ci%colors.length]+'22',
+          // 좋아요 + 저장 합산 (둘 다 null이면 null 유지)
+          data:p.weeks.map(w=>{
+            if(w.likes===null && w.saves===null)return null;
+            return (w.likes||0)+(w.saves||0);
+          })
+        }))
+      },
+      options:chartOpts
+    }));
+
   },100);
 }
 
+// ── 탭 전환 ───────────────────────────────────────────────
 function setTab(t,el){
-  ['overview','personal','stats'].forEach(id=>{document.getElementById('tab-'+id).style.display='none';});
+  ['overview','personal','stats'].forEach(id=>{
+    document.getElementById('tab-'+id).style.display='none';
+  });
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
   el.classList.add('on');
   document.getElementById('tab-'+t).style.display='';
   if(t==='stats')renderStats();
 }
 
+// ── 데이터 로드 ───────────────────────────────────────────
 function loadCSV(){
   document.getElementById('upd-label').textContent='데이터 불러오는 중...';
   document.getElementById('error-area').innerHTML='';
   fetch(CSV_URL)
-    .then(r=>r.text())
+    .then(r=>{
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      return r.text();
+    })
     .then(csv=>{
       DATA=parseCSV(csv);
-      calcStats();renderOverview();renderPersonal();
+      calcStats();
+      renderOverview();
+      renderPersonal();
       const cur=document.querySelector('.tab.on');
       if(cur&&cur.textContent.includes('성장'))renderStats();
-      document.getElementById('upd-label').textContent='마지막 업데이트: '+new Date().toLocaleTimeString('ko-KR')+' · Google Sheets 연동';
+      document.getElementById('upd-label').textContent=
+        '마지막 업데이트: '+new Date().toLocaleTimeString('ko-KR')+' · Google Sheets 연동 (총 '+DATA.length+'명)';
     })
     .catch(e=>{
-      document.getElementById('error-area').innerHTML=`<div class="error-box">데이터를 불러오지 못했습니다. 잠시 후 새로고침해주세요.</div>`;
+      document.getElementById('error-area').innerHTML=
+        `<div class="error-box">데이터를 불러오지 못했습니다. 잠시 후 새로고침해주세요. (${e.message})</div>`;
       document.getElementById('upd-label').textContent='연결 실패';
     });
 }

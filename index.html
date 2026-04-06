@@ -134,6 +134,7 @@ function parseCSV(text){
     return{
       name,
       startFollower: toNum(obj['시작_팔로워']),
+      startEngagement: toNum(obj['시작_좋아요저장합계']),
       weeks:[1,2,3,4].map(w=>({
         uploads: toNum(obj[`${w}주차_업로드수`]),
         views:   toNum(obj[`${w}주차_조회수합계`]),
@@ -260,10 +261,9 @@ function renderPersonal(){
       flHtml=`<span style="font-size:11px;color:#ccc">-</span>`;
     }
 
-    // ── 좋아요+저장 합계: 1주차 합계 → 가장 최근 주차 합계
-    // 1주차 합계 (처음 기준)
-    const lk0=p.weeks[0].likes, sv0=p.weeks[0].saves;
-    const eng0=(lk0!==null && sv0!==null) ? lk0+sv0 : (lk0!==null?lk0:(sv0!==null?sv0:null));
+    // ── 좋아요+저장 합계: 시작값 → 가장 최근 주차 합계
+    // 시작값: 5번 탭 시작_좋아요저장합계 열
+    const eng0 = p.startEngagement;
 
     // 최신 주차 합계
     let engLatest=null;

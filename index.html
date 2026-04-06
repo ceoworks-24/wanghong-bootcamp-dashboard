@@ -136,12 +136,11 @@ function parseCSV(text){
       startFollower: toNum(obj['시작_팔로워']),
       startEngagement: toNum(obj['시작_좋아요저장합계']),
       weeks:[1,2,3,4].map(w=>({
-        uploads: toNum(obj[`${w}주차_업로드수`]),
-        views:   toNum(obj[`${w}주차_조회수합계`]),
-        likes:   toNum(obj[`${w}주차_좋아요합계`]),
-        saves:   toNum(obj[`${w}주차_저장합계`]),
-        comments:toNum(obj[`${w}주차_댓글합계`]),
-        follower:toNum(obj[`${w}주차_팔로워`]),
+        uploads:    toNum(obj[`${w}주차_업로드수`]),
+        views:      toNum(obj[`${w}주차_조회수합계`]),
+        comments:   toNum(obj[`${w}주차_댓글합계`]),
+        follower:   toNum(obj[`${w}주차_팔로워`]),
+        engagement: toNum(obj[`${w}주차_좋아요저장합계`]),
       }))
     };
   }).filter(Boolean); // null 제거 → 최인영 포함 전원 처리
@@ -265,15 +264,8 @@ function renderPersonal(){
     // 시작값: 5번 탭 시작_좋아요저장합계 열
     const eng0 = p.startEngagement;
 
-    // 최신 주차 합계
-    let engLatest=null;
-    for(let i=p.weeks.length-1;i>=0;i--){
-      const lk=p.weeks[i].likes, sv=p.weeks[i].saves;
-      if(lk!==null || sv!==null){
-        engLatest=(lk||0)+(sv||0);
-        break;
-      }
-    }
+    // 최신 주차 합계: engagement 필드에서 직접 읽기
+    const engLatest = p.weeks.slice().reverse().find(w=>w.engagement!==null)?.engagement??null;
 
     let engHtml;
     if(eng0!==null && engLatest!==null && engLatest!==eng0){
@@ -378,11 +370,11 @@ function renderStats(){
       options:chartOpts
     }));
 
-    // [버그 수정] 좋아요+저장 합계를 하나의 선으로 표시
+    // 좋아요+저장 합계 추이 (engagement 필드 직접 사용)
     chartObjs.push(new Chart(document.getElementById('c-eng'),{
       type:'line',
       data:{
-        labels:wLabels,
+        labels:['시작',...wLabels],
         datasets:active.map((p,ci)=>({
           label:p.name,
           tension:0.3,
@@ -390,11 +382,7 @@ function renderStats(){
           spanGaps:false,
           borderColor:colors[ci%colors.length],
           backgroundColor:colors[ci%colors.length]+'22',
-          // 좋아요 + 저장 합산 (둘 다 null이면 null 유지)
-          data:p.weeks.map(w=>{
-            if(w.likes===null && w.saves===null)return null;
-            return (w.likes||0)+(w.saves||0);
-          })
+          data:[p.startEngagement,...p.weeks.map(w=>w.engagement)]
         }))
       },
       options:chartOpts

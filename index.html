@@ -191,12 +191,12 @@ function renderOverview(){
   // 오늘 기준 페이스 계산
   const weekStart=WEEKS[CUR_WEEK].start;
   const today=new Date();today.setHours(0,0,0,0);
-  const daysPassed=Math.min(Math.floor((today-weekStart)/(1000*60*60*24))+1,7);
-  // 1~4일째: 그대로, 5일째 이후: 5건
+  const daysPassed=Math.floor((today-weekStart)/(1000*60*60*24))+1;
+  // 주차 시작 전이면 섹션 숨김, 5일째 이후는 5건으로 고정
   const paceTarget=Math.min(daysPassed,PPW);
 
-  // 우수 참가자: 오늘 페이스 이상 업로드한 사람
-  const goodList=DATA.filter(p=>curWeekUploads(p)>=paceTarget);
+  // 우수 참가자: 오늘 페이스 이상 + 1건 이상 업로드한 사람 (0건 제외)
+  const goodList=DATA.filter(p=>curWeekUploads(p)>=paceTarget&&curWeekUploads(p)>0);
   if(goodList.length){
     html+=`<div class="panel">
       <div style="padding:11px 16px;background:#f0faf5;border-bottom:1px solid #b7e4cc;font-size:13px;font-weight:600;color:#0a6644">🌟 ${WEEKS[CUR_WEEK].label} 업로드 우수 참가자 (${goodList.length}명 · 오늘 기준 ${paceTarget}건 이상)</div>
@@ -260,21 +260,21 @@ function renderPersonal(){
     const done=totalDone(p),pc=totalPct(p);
     const color=pc>=75?'#1D9E75':pc>=40?'#f39c12':'#e74c3c';
     const fl0=p.startFollower;
-    const flLatest=p.weeks.slice().reverse().find(w=>w.follower!==null)?.follower??null;
-    let flHtml;
-    if(fl0!==null&&flLatest!==null){
-      const flColor=flLatest>fl0?'#1D9E75':flLatest<fl0?'#e74c3c':'#888';
-      flHtml=`<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px"><span style="color:#aaa">${fl0}</span><span style="color:#aaa">→</span><span style="color:${flColor};font-weight:600">${flLatest}</span></span>`;
-    }else if(fl0!==null){flHtml=`<span style="font-size:11px;color:#aaa">${fl0}</span>`;}
-    else{flHtml=`<span style="font-size:11px;color:#ccc">-</span>`;}
     const eng0=p.startEngagement;
+    const flLatest=p.weeks.slice().reverse().find(w=>w.follower!==null)?.follower??null;
     const engLatest=p.weeks.slice().reverse().find(w=>w.engagement!==null)?.engagement??null;
-    let engHtml;
-    if(eng0!==null&&engLatest!==null&&engLatest!==eng0){
-      const eColor=engLatest>eng0?'#1D9E75':engLatest<eng0?'#e74c3c':'#888';
-      engHtml=`<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px"><span style="color:#aaa">${eng0}</span><span style="color:#aaa">→</span><span style="color:${eColor};font-weight:600">${engLatest}</span></span>`;
-    }else if(eng0!==null){engHtml=`<span style="font-size:11px;color:#aaa">${eng0}</span>`;}
-    else{engHtml=`<span style="font-size:11px;color:#ccc">-</span>`;}
+
+    function makeLatestHtml(start, latest){
+      if(start!==null&&latest!==null){
+        const c=latest>start?'#1D9E75':latest<start?'#e74c3c':'#888';
+        return`<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px"><span style="color:#aaa">${start}</span><span style="color:#aaa">→</span><span style="color:${c};font-weight:700">${latest}</span></span>`;
+      }else if(start!==null){
+        return`<span style="font-size:11px;color:#aaa">${start}</span>`;
+      }
+      return`<span style="font-size:11px;color:#ccc">-</span>`;
+    }
+    const flHtml=makeLatestHtml(fl0,flLatest);
+    const engHtml=makeLatestHtml(eng0,engLatest);
     html+=`<div class="d-card">
       <div class="d-name"><span>${p.name}</span><span style="color:${color};font-size:11px;font-weight:600">${done}/20개</span></div>
       <div style="height:4px;background:#eef0f3;border-radius:2px;margin-bottom:8px"><div style="height:100%;width:${pc}%;background:${color};border-radius:2px"></div></div>

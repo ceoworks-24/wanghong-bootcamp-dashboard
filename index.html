@@ -76,7 +76,10 @@ table{min-width:600px}
       <div class="hdr-title">왕홍 부트캠프 운영 대시보드</div>
       <div class="hdr-sub" id="upd-label">데이터 불러오는 중...</div>
     </div>
-    <button class="btn btn-g" onclick="loadCSV()">새로고침</button>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn" id="install-btn" style="display:none" onclick="installApp()">📲 홈화면에 추가</button>
+      <button class="btn btn-g" onclick="loadCSV()">새로고침</button>
+    </div>
   </div>
 
   <div id="error-area"></div>
@@ -337,6 +340,26 @@ function loadCSV(){
       document.getElementById('upd-label').textContent='연결 실패';
     });
 }
+// PWA 설치 프롬프트
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',(e)=>{
+  e.preventDefault();
+  deferredPrompt=e;
+  document.getElementById('install-btn').style.display='';
+});
+window.addEventListener('appinstalled',()=>{
+  document.getElementById('install-btn').style.display='none';
+  deferredPrompt=null;
+});
+function installApp(){
+  if(!deferredPrompt)return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(()=>{
+    deferredPrompt=null;
+    document.getElementById('install-btn').style.display='none';
+  });
+}
+
 loadCSV();
 </script>
 </body>

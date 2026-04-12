@@ -188,6 +188,26 @@ function renderOverview(){
   const totalMissCount=missSorted.reduce((s,p)=>s+(PPW-curWeekUploads(p)),0);
 
   let html='';
+  // 오늘 기준 페이스 계산
+  const weekStart=WEEKS[CUR_WEEK].start;
+  const today=new Date();today.setHours(0,0,0,0);
+  const daysPassed=Math.min(Math.floor((today-weekStart)/(1000*60*60*24))+1,7);
+  // 1~4일째: 그대로, 5일째 이후: 5건
+  const paceTarget=Math.min(daysPassed,PPW);
+
+  // 우수 참가자: 오늘 페이스 이상 업로드한 사람
+  const goodList=DATA.filter(p=>curWeekUploads(p)>=paceTarget);
+  if(goodList.length){
+    html+=`<div class="panel">
+      <div style="padding:11px 16px;background:#f0faf5;border-bottom:1px solid #b7e4cc;font-size:13px;font-weight:600;color:#0a6644">🌟 ${WEEKS[CUR_WEEK].label} 업로드 우수 참가자 (${goodList.length}명 · 오늘 기준 ${paceTarget}건 이상)</div>
+      <div class="miss-chips">`;
+    goodList.forEach(p=>{
+      const u=curWeekUploads(p);
+      html+=`<span style="padding:4px 10px;background:#e6f7f1;color:#0a6644;border-radius:12px;font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:4px">${p.name}<span style="font-size:10px;font-weight:700;background:#0a6644;color:#fff;border-radius:7px;padding:1px 5px">${u}건</span></span>`;
+    });
+    html+='</div></div>';
+  }
+
   if(missSorted.length){
     html+=`<div class="panel">
       <div class="miss-panel-hdr">⚠ ${WEEKS[CUR_WEEK].label} 업로드 미완료 참가자 (${missSorted.length}명 · 총 ${totalMissCount}개 부족)</div>

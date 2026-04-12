@@ -197,16 +197,18 @@ function renderOverview(){
 
   // 우수 참가자: 오늘 페이스 이상 + 1건 이상 업로드한 사람 (0건 제외)
   const goodList=DATA.filter(p=>curWeekUploads(p)>=paceTarget&&curWeekUploads(p)>0);
+  html+=`<div class="panel">
+    <div style="padding:11px 16px;background:#f0faf5;border-bottom:1px solid #b7e4cc;font-size:13px;font-weight:600;color:#0a6644">🌟 ${WEEKS[CUR_WEEK].label} 업로드 우수 참가자 (${goodList.length}명 · 오늘 기준 ${paceTarget}건 이상)</div>
+    <div class="miss-chips">`;
   if(goodList.length){
-    html+=`<div class="panel">
-      <div style="padding:11px 16px;background:#f0faf5;border-bottom:1px solid #b7e4cc;font-size:13px;font-weight:600;color:#0a6644">🌟 ${WEEKS[CUR_WEEK].label} 업로드 우수 참가자 (${goodList.length}명 · 오늘 기준 ${paceTarget}건 이상)</div>
-      <div class="miss-chips">`;
     goodList.forEach(p=>{
       const u=curWeekUploads(p);
       html+=`<span style="padding:4px 10px;background:#e6f7f1;color:#0a6644;border-radius:12px;font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:4px">${p.name}<span style="font-size:10px;font-weight:700;background:#0a6644;color:#fff;border-radius:7px;padding:1px 5px">${u}건</span></span>`;
     });
-    html+='</div></div>';
+  }else{
+    html+=`<span style="font-size:12px;color:#aaa">아직 해당자가 없습니다</span>`;
   }
+  html+='</div></div>';
 
   if(missSorted.length){
     html+=`<div class="panel">

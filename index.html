@@ -216,7 +216,7 @@ function renderOverview(){
 
   if(missSorted.length){
     html+=`<div class="panel">
-      <div class="miss-panel-hdr">⚠ ${WEEKS[CUR_WEEK].label} 업로드 필요 참가자 (${missSorted.length}명 · 총 ${totalMissCount}개 부족)</div>
+      <div class="miss-panel-hdr">⚠ ${WEEKS[CUR_WEEK].label} 업로드 필요 참가자 (${missSorted.length}명 · 오늘 기준 ${paceTarget}건 미달)</div>
       <div class="miss-chips">`;
     missSorted.forEach(p=>{
       const remain=PPW-curWeekUploads(p);

@@ -187,7 +187,7 @@ function calcStats(){
 
 function renderOverview(){
   // 미완료자: 업로드 적은 순(0개→4개) 정렬
-  const missSorted=[...DATA.filter(p=>!curWeekDone(p))].sort((a,b)=>curWeekUploads(a)-curWeekUploads(b));
+  const missSorted=[...DATA.filter(p=>!curWeekDone(p)&&curWeekUploads(p)<paceTarget)].sort((a,b)=>curWeekUploads(a)-curWeekUploads(b));
   const totalMissCount=missSorted.reduce((s,p)=>s+(PPW-curWeekUploads(p)),0);
 
   let html='';
@@ -215,7 +215,7 @@ function renderOverview(){
 
   if(missSorted.length){
     html+=`<div class="panel">
-      <div class="miss-panel-hdr">⚠ ${WEEKS[CUR_WEEK].label} 업로드 미완료 참가자 (${missSorted.length}명 · 총 ${totalMissCount}개 부족)</div>
+      <div class="miss-panel-hdr">⚠ ${WEEKS[CUR_WEEK].label} 업로드 필요 참가자 (${missSorted.length}명 · 총 ${totalMissCount}개 부족)</div>
       <div class="miss-chips">`;
     missSorted.forEach(p=>{
       const remain=PPW-curWeekUploads(p);

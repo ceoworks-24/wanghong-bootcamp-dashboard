@@ -219,7 +219,7 @@ function renderOverview(){
       <div class="miss-panel-hdr">⚠ ${WEEKS[CUR_WEEK].label} 업로드 필요 참가자 (${missSorted.length}명 · 오늘 기준 ${paceTarget}건 미달)</div>
       <div class="miss-chips">`;
     missSorted.forEach(p=>{
-      const remain=PPW-curWeekUploads(p);
+      const remain=paceTarget-curWeekUploads(p);
       html+=`<span class="chip">${p.name}<span class="chip-cnt">-${remain}개</span></span>`;
     });
     html+='</div></div>';

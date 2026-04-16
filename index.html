@@ -259,7 +259,11 @@ function renderOverview(){
     html+=`<tr><td style="font-weight:600">${p.name}</td>
     <td><div class="prog-wrap"><div class="prog-bar"><div class="prog-fill" style="width:${pc}%;background:${c}"></div></div><span style="font-size:11px;color:#888;min-width:26px">${pc}%</span></div></td>
     <td><span style="font-weight:700;color:${uploadTxt};background:${uploadBg};padding:3px 8px;border-radius:8px;font-size:12px">${done}/20</span></td>`;
-    p.weeks.forEach(w=>{html+=`<td><span class="badge ${weekBadgeClass(w.uploads)}">${weekBadgeText(w.uploads)}</span></td>`;});
+    p.weeks.forEach(w=>{
+      const bg=c==='#27ae60'?'#e8f8ee':c==='#f39c12'?'#fff8e6':'#fff0f0';
+      const tc=c==='#27ae60'?'#1a7a3a':c==='#f39c12'?'#7a4f00':'#c0392b';
+      html+=`<td><span class="badge" style="background:${bg};color:${tc}">${weekBadgeText(w.uploads)}</span></td>`;
+    });
     html+='</tr>';
   });
   html+='</tbody></table></div></div>';

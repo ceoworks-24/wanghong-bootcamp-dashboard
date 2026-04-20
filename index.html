@@ -126,15 +126,24 @@ function totalPct(p){return Math.round(totalDone(p)/20*100);}
 function curWeekUploads(p){const u=p.weeks[CUR_WEEK].uploads;return u===null?0:u;}
 function curWeekDone(p){return curWeekUploads(p)>=PPW;}
 
+// ── 누적 페이스 타겟 계산 ──────────────────────────────
+// 프로그램 시작일(1주차 월요일)부터 오늘까지 며칠 지났는지로 계산
+// 예: 2주차 월요일 = 8일째 → 누적 목표 8건 (단, 주차 최대치 적용)
+function calcPaceTarget(){
+  const today=new Date();today.setHours(0,0,0,0);
+  const programStart=WEEKS[0].start;
+  const totalDaysPassed=Math.floor((today-programStart)/(1000*60*60*24))+1;
+  // 각 주차는 최대 PPW(5)건씩 누적
+  const maxSoFar=(CUR_WEEK+1)*PPW;
+  return Math.min(totalDaysPassed,maxSoFar);
+}
+
 // ── 상대평가 색깔 계산 ──────────────────────────────
-// 전체 업로드 수 기준: 상위30%=초록, 중위40%=주황, 하위30%=빨강
-// 동점자는 같은 색 (비율 유동 허용)
 function calcRelativeColors(dataArr){
   const n=dataArr.length;
   if(!n)return{};
   const scores=dataArr.map(p=>totalDone(p));
   const sorted=[...scores].sort((a,b)=>b-a);
-  // 동점 최상위 순위 맵
   const rankMap={};
   sorted.forEach((s,i)=>{if(!(s in rankMap))rankMap[s]=i+1;});
   const colorMap={};
@@ -211,22 +220,27 @@ function calcStats(){
 
 function renderOverview(){
   const colorMap=calcRelativeColors(DATA);
-  const weekStart=WEEKS[CUR_WEEK].start;
-  const today=new Date();today.setHours(0,0,0,0);
-  const daysPassed=Math.floor((today-weekStart)/(1000*60*60*24))+1;
-  const paceTarget=Math.min(daysPassed,PPW);
-  const missSorted=[...DATA.filter(p=>!curWeekDone(p)&&curWeekUploads(p)<paceTarget)].sort((a,b)=>curWeekUploads(a)-curWeekUploads(b));
+
+  // ── 수정된 페이스 타겟: 누적 기준 ──
+  const paceTarget=calcPaceTarget();
+
+  // 우수 참가자: 누적 업로드 수 >= 누적 페이스 타겟
+  const goodList=DATA.filter(p=>totalDone(p)>=paceTarget);
+
+  // 필요 참가자: 누적 업로드 수 < 누적 페이스 타겟, 업로드 적은 순 정렬
+  const missSorted=[...DATA.filter(p=>totalDone(p)<paceTarget)]
+    .sort((a,b)=>totalDone(a)-totalDone(b));
 
   let html='';
 
-  const goodList=DATA.filter(p=>curWeekUploads(p)>=paceTarget&&curWeekUploads(p)>0);
   html+=`<div class="panel">
-    <div style="padding:11px 16px;background:#f0faf5;border-bottom:1px solid #b7e4cc;font-size:13px;font-weight:600;color:#0a6644">🌟 ${WEEKS[CUR_WEEK].label} 업로드 우수 참가자 (${goodList.length}명 · 오늘 기준 ${paceTarget}건 이상)</div>
+    <div style="padding:11px 16px;background:#f0faf5;border-bottom:1px solid #b7e4cc;font-size:13px;font-weight:600;color:#0a6644">🌟 ${WEEKS[CUR_WEEK].label} 업로드 우수 참가자 (${goodList.length}명 · 오늘 기준 누적 ${paceTarget}건 이상)</div>
     <div class="miss-chips">`;
   if(goodList.length){
     goodList.forEach(p=>{
-      const u=curWeekUploads(p);
-      html+=`<span style="padding:4px 10px;background:#e6f7f1;color:#0a6644;border-radius:12px;font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:4px">${p.name}<span style="font-size:10px;font-weight:700;background:#0a6644;color:#fff;border-radius:7px;padding:1px 5px">${u}건</span></span>`;
+      const u=totalDone(p);
+      const diff=u-paceTarget;
+      html+=`<span style="padding:4px 10px;background:#e6f7f1;color:#0a6644;border-radius:12px;font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:4px">${p.name}<span style="font-size:10px;font-weight:700;background:#0a6644;color:#fff;border-radius:7px;padding:1px 5px">${diff>=0?'+':''}${diff}건</span></span>`;
     });
   }else{
     html+=`<span style="font-size:12px;color:#aaa">아직 해당자가 없습니다</span>`;
@@ -235,10 +249,10 @@ function renderOverview(){
 
   if(missSorted.length){
     html+=`<div class="panel">
-      <div class="miss-panel-hdr">⚠ ${WEEKS[CUR_WEEK].label} 업로드 필요 참가자 (${missSorted.length}명 · 오늘 기준 ${paceTarget}건 미달)</div>
+      <div class="miss-panel-hdr">⚠ ${WEEKS[CUR_WEEK].label} 업로드 필요 참가자 (${missSorted.length}명 · 오늘 기준 누적 ${paceTarget}건 미달)</div>
       <div class="miss-chips">`;
     missSorted.forEach(p=>{
-      const remain=paceTarget-curWeekUploads(p);
+      const remain=paceTarget-totalDone(p);
       html+=`<span class="chip">${p.name}<span class="chip-cnt">-${remain}개</span></span>`;
     });
     html+='</div></div>';

@@ -144,23 +144,27 @@ function calcPaceTarget(){
   return Math.min(weekdayCount,maxSoFar);
 }
 
-// ── 상대평가 색깔 계산 ──────────────────────────────
+// ── 색깔 계산: 페이스 통과 = 초록, 미달자 내 상대평가로 주황/빨강 ──
+// 페이스 통과(totalDone >= paceTarget) → 초록
+// 미달자 중 상위 60% → 주황, 하위 40% → 빨강
 function calcRelativeColors(dataArr){
   const n=dataArr.length;
   if(!n)return{};
-  const scores=dataArr.map(p=>totalDone(p));
-  const sorted=[...scores].sort((a,b)=>b-a);
-  const rankMap={};
-  sorted.forEach((s,i)=>{if(!(s in rankMap))rankMap[s]=i+1;});
+  const paceTarget=calcPaceTarget();
+  const missArr=dataArr.filter(p=>totalDone(p)<paceTarget);
+  const missN=missArr.length;
+  const missSorted=[...missArr].map(p=>totalDone(p)).sort((a,b)=>b-a);
+  const missRankMap={};
+  missSorted.forEach((s,i)=>{if(!(s in missRankMap))missRankMap[s]=i+1;});
   const colorMap={};
   dataArr.forEach(p=>{
-    const rank=rankMap[totalDone(p)];
-    const pct=rank/n;
-    let color;
-    if(pct<=0.30)color='#27ae60';
-    else if(pct<=0.70)color='#f39c12';
-    else color='#e74c3c';
-    colorMap[p.name]=color;
+    if(totalDone(p)>=paceTarget){
+      colorMap[p.name]='#27ae60';
+    }else{
+      const rank=missRankMap[totalDone(p)];
+      const pct=missN>0?rank/missN:1;
+      colorMap[p.name]=pct<=0.60?'#f39c12':'#e74c3c';
+    }
   });
   return colorMap;
 }

@@ -126,16 +126,22 @@ function totalPct(p){return Math.round(totalDone(p)/20*100);}
 function curWeekUploads(p){const u=p.weeks[CUR_WEEK].uploads;return u===null?0:u;}
 function curWeekDone(p){return curWeekUploads(p)>=PPW;}
 
-// ── 누적 페이스 타겟 계산 ──────────────────────────────
-// 프로그램 시작일(1주차 월요일)부터 오늘까지 며칠 지났는지로 계산
-// 예: 2주차 월요일 = 8일째 → 누적 목표 8건 (단, 주차 최대치 적용)
+// ── 누적 페이스 타겟 계산 (평일 기준) ──────────────────────────────
+// 프로그램 시작일(1주차 월요일)부터 오늘까지 지난 평일(월~금) 수로 계산
+// 토/일은 보충일이므로 카운트 제외
+// 예: 2주차 월요일(4/20) → 평일 6일 → paceTarget = 6건
 function calcPaceTarget(){
   const today=new Date();today.setHours(0,0,0,0);
   const programStart=WEEKS[0].start;
-  const totalDaysPassed=Math.floor((today-programStart)/(1000*60*60*24))+1;
-  // 각 주차는 최대 PPW(5)건씩 누적
+  let weekdayCount=0;
+  let d=new Date(programStart);
+  while(d<=today){
+    const dow=d.getDay(); // 0=일, 6=토
+    if(dow!==0&&dow!==6)weekdayCount++;
+    d.setDate(d.getDate()+1);
+  }
   const maxSoFar=(CUR_WEEK+1)*PPW;
-  return Math.min(totalDaysPassed,maxSoFar);
+  return Math.min(weekdayCount,maxSoFar);
 }
 
 // ── 상대평가 색깔 계산 ──────────────────────────────

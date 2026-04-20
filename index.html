@@ -249,8 +249,7 @@ function renderOverview(){
   if(goodList.length){
     goodList.forEach(p=>{
       const u=totalDone(p);
-      const diff=u-paceTarget;
-      html+=`<span style="padding:4px 10px;background:#e6f7f1;color:#0a6644;border-radius:12px;font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:4px">${p.name}<span style="font-size:10px;font-weight:700;background:#0a6644;color:#fff;border-radius:7px;padding:1px 5px">${diff>=0?'+':''}${diff}건</span></span>`;
+      html+=`<span style="padding:4px 10px;background:#e6f7f1;color:#0a6644;border-radius:12px;font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:4px">${p.name}<span style="font-size:10px;font-weight:700;background:#0a6644;color:#fff;border-radius:7px;padding:1px 5px">${u}건</span></span>`;
     });
   }else{
     html+=`<span style="font-size:12px;color:#aaa">아직 해당자가 없습니다</span>`;

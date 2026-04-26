@@ -294,11 +294,11 @@ function renderOverview(){
     });
     html+='</tr>';
   });
-  // 탈락자: 하단에 삭선+회색 처리
+  // 중단자: 하단에 삭선+회색 처리
   eliminatedData.forEach(p=>{
     const done=totalDone(p),pc=totalPct(p);
     html+=`<tr style="opacity:0.45;background:#f5f5f5">
-    <td style="font-weight:600;text-decoration:line-through;color:#999">${p.name} <span style="font-size:10px;background:#ccc;color:#666;border-radius:6px;padding:1px 5px;font-weight:500;text-decoration:none;display:inline-block">탈락</span></td>
+    <td style="font-weight:600;text-decoration:line-through;color:#999">${p.name} <span style="font-size:10px;background:#ccc;color:#666;border-radius:6px;padding:1px 5px;font-weight:500;text-decoration:none;display:inline-block">중단</span></td>
     <td><div class="prog-wrap"><div class="prog-bar"><div class="prog-fill" style="width:${pc}%;background:#bbb"></div></div><span style="font-size:11px;color:#bbb;min-width:26px">${pc}%</span></div></td>
     <td><span style="font-weight:700;color:#bbb;background:#eee;padding:3px 8px;border-radius:8px;font-size:12px;text-decoration:line-through">${done}/20</span></td>`;
     p.weeks.forEach(w=>{
@@ -352,7 +352,7 @@ function renderPersonal(){
     const flHtml=makeLatestHtml(fl0,flLatest);
     const engHtml=makeLatestHtml(eng0,engLatest);
     const nameHtml=isEliminated
-      ?`<span style="text-decoration:line-through;color:#aaa">${p.name}</span><span style="font-size:10px;background:#ccc;color:#666;border-radius:6px;padding:1px 5px;margin-left:4px;font-weight:500">탈락</span>`
+      ?`<span style="text-decoration:line-through;color:#aaa">${p.name}</span><span style="font-size:10px;background:#ccc;color:#666;border-radius:6px;padding:1px 5px;margin-left:4px;font-weight:500">중단</span>`
       :`<span>${p.name}</span>`;
 
     html+=`<div class="d-card" style="border-color:${cardBorder};${cardStyle}">

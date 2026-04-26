@@ -112,6 +112,7 @@ const WEEKS=[
 ];
 const PPW=5;
 const EXCLUDED_NAMES=['김혜원'];
+const ELIMINATED_NAMES=['최은진'];
 
 function getCurWeek(){
   const today=new Date();today.setHours(0,0,0,0);
@@ -201,7 +202,8 @@ function parseCSV(text){
     const name=obj['이름']||'';
     if(!name)return null;
     if(EXCLUDED_NAMES.includes(name))return null;
-    return{name,
+    const eliminated=ELIMINATED_NAMES.includes(name);
+    return{name,eliminated,
       startFollower:toNum(obj['시작_팔로워']),
       startEngagement:toNum(obj['시작_좋아요저장합계']),
       weeks:[1,2,3,4].map(w=>({
@@ -216,29 +218,32 @@ function parseCSV(text){
 }
 
 function calcStats(){
-  const total=DATA.length;
+  const activeData=DATA.filter(p=>!p.eliminated);
+  const total=activeData.length;
   document.getElementById('s-total').textContent=total;
   const weekTarget=total*PPW;
-  const weekUploaded=DATA.reduce((s,p)=>s+curWeekUploads(p),0);
+  const weekUploaded=activeData.reduce((s,p)=>s+curWeekUploads(p),0);
   document.getElementById('s-week-pct').textContent=weekTarget?Math.round(weekUploaded/weekTarget*100):0;
   document.getElementById('s-week-detail').textContent=weekTarget?`${weekUploaded}/${weekTarget}건`:'';
-  const weekMiss=DATA.filter(p=>!curWeekDone(p)).length;
+  const weekMiss=activeData.filter(p=>!curWeekDone(p)).length;
   document.getElementById('s-miss').textContent=weekMiss;
-  const allDone=DATA.reduce((s,p)=>s+totalDone(p),0);
+  const allDone=activeData.reduce((s,p)=>s+totalDone(p),0);
   document.getElementById('s-total-pct').textContent=total?Math.round(allDone/(total*20)*100):0;
 }
 
 function renderOverview(){
-  const colorMap=calcRelativeColors(DATA);
+  const activeData=DATA.filter(p=>!p.eliminated);
+  const eliminatedData=DATA.filter(p=>p.eliminated);
+  const colorMap=calcRelativeColors(activeData);
 
   // ── 수정된 페이스 타겟: 누적 기준 ──
   const paceTarget=calcPaceTarget();
 
   // 우수 참가자: 누적 업로드 수 >= 누적 페이스 타겟
-  const goodList=DATA.filter(p=>totalDone(p)>=paceTarget);
+  const goodList=activeData.filter(p=>totalDone(p)>=paceTarget);
 
   // 필요 참가자: 누적 업로드 수 < 누적 페이스 타겟, 업로드 적은 순 정렬
-  const missSorted=[...DATA.filter(p=>totalDone(p)<paceTarget)]
+  const missSorted=[...activeData.filter(p=>totalDone(p)<paceTarget)]
     .sort((a,b)=>totalDone(a)-totalDone(b));
 
   let html='';
@@ -269,7 +274,7 @@ function renderOverview(){
     html+=`<div class="panel"><div class="panel-hdr" style="color:#0a6644">✓ ${WEEKS[CUR_WEEK].label} 전원 업로드 완료!</div></div>`;
   }
 
-  const sorted=[...DATA].sort((a,b)=>totalDone(b)-totalDone(a));
+  const sorted=[...activeData].sort((a,b)=>totalDone(b)-totalDone(a));
   html+=`<div class="panel"><div class="panel-hdr"><span>참가자별 전체 진행 현황</span><span style="font-size:11px;font-weight:400;color:#888">달성률 높은 순</span></div><div class="panel-body" style="padding:0">`;
   html+=`<table><thead><tr><th>이름</th><th style="min-width:110px">전체 달성률</th><th>업로드</th>`;
   WEEKS.forEach(w=>{html+=`<th>${w.label}<br><span style="font-size:10px;font-weight:400;color:#aaa">${w.dates}</span></th>`;});
@@ -289,12 +294,24 @@ function renderOverview(){
     });
     html+='</tr>';
   });
+  // 탈락자: 하단에 삭선+회색 처리
+  eliminatedData.forEach(p=>{
+    const done=totalDone(p),pc=totalPct(p);
+    html+=`<tr style="opacity:0.45;background:#f5f5f5">
+    <td style="font-weight:600;text-decoration:line-through;color:#999">${p.name} <span style="font-size:10px;background:#ccc;color:#666;border-radius:6px;padding:1px 5px;font-weight:500;text-decoration:none;display:inline-block">탈락</span></td>
+    <td><div class="prog-wrap"><div class="prog-bar"><div class="prog-fill" style="width:${pc}%;background:#bbb"></div></div><span style="font-size:11px;color:#bbb;min-width:26px">${pc}%</span></div></td>
+    <td><span style="font-weight:700;color:#bbb;background:#eee;padding:3px 8px;border-radius:8px;font-size:12px;text-decoration:line-through">${done}/20</span></td>`;
+    p.weeks.forEach(w=>{
+      html+=`<td><span class="badge" style="background:#eee;color:#bbb;text-decoration:line-through">${weekBadgeText(w.uploads)}</span></td>`;
+    });
+    html+='</tr>';
+  });
   html+='</tbody></table></div></div>';
 
   html+=`<div class="panel"><div class="panel-hdr">주차별 입력 현황 요약</div><div class="panel-body" style="padding:0"><table><thead><tr><th>주차</th><th>기간</th><th>5건 완료자</th><th>5건 미완료자</th><th>5건 완료율</th></tr></thead><tbody>`;
   WEEKS.forEach((w,wi)=>{
-    const done=DATA.filter(p=>p.weeks[wi].uploads===PPW).length;
-    const total=DATA.length,miss=total-done;
+    const done=activeData.filter(p=>p.weeks[wi].uploads===PPW).length;
+    const total=activeData.length,miss=total-done;
     const pc=total?Math.round(done/total*100):0;
     const c=pc>=75?'#27ae60':pc>=50?'#f39c12':'#e74c3c';
     html+=`<tr><td style="font-weight:600">${w.label}</td><td style="color:#888">${w.dates}</td>
@@ -308,13 +325,16 @@ function renderOverview(){
 
 function renderPersonal(){
   if(!DATA.length){document.getElementById('tab-personal').innerHTML='<div class="empty-box">데이터가 없습니다</div>';return;}
-  const colorMap=calcRelativeColors(DATA);
-  const sorted=[...DATA].sort((a,b)=>totalDone(b)-totalDone(a));
+  const activeData=DATA.filter(p=>!p.eliminated);
+  const eliminatedData=DATA.filter(p=>p.eliminated);
+  const colorMap=calcRelativeColors(activeData);
+  const sorted=[...activeData].sort((a,b)=>totalDone(b)-totalDone(a));
   let html=`<div class="detail-grid">`;
-  sorted.forEach(p=>{
+  const renderCard=(p,isEliminated)=>{
     const done=totalDone(p),pc=totalPct(p);
-    const color=colorMap[p.name]||'#888';
-    const cardBorder=color==='#27ae60'?'#b7e4cc':color==='#f39c12'?'#ffd89a':'#ffb3b3';
+    const color=isEliminated?'#bbb':(colorMap[p.name]||'#888');
+    const cardBorder=isEliminated?'#ddd':(color==='#27ae60'?'#b7e4cc':color==='#f39c12'?'#ffd89a':'#ffb3b3');
+    const cardStyle=isEliminated?'opacity:0.45;background:#f8f8f8;':'';
     const fl0=p.startFollower;
     const eng0=p.startEngagement;
     const flLatest=p.weeks.slice().reverse().find(w=>w.follower!==null)?.follower??null;
@@ -322,7 +342,7 @@ function renderPersonal(){
 
     function makeLatestHtml(start,latest){
       if(start!==null&&latest!==null){
-        const c=latest>start?'#1D9E75':latest<start?'#e74c3c':'#888';
+        const c=isEliminated?'#bbb':latest>start?'#1D9E75':latest<start?'#e74c3c':'#888';
         return`<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px"><span style="color:#aaa">${start}</span><span style="color:#aaa">→</span><span style="color:${c};font-weight:700">${latest}</span></span>`;
       }else if(start!==null){
         return`<span style="font-size:11px;color:#aaa">${start}</span>`;
@@ -331,9 +351,12 @@ function renderPersonal(){
     }
     const flHtml=makeLatestHtml(fl0,flLatest);
     const engHtml=makeLatestHtml(eng0,engLatest);
+    const nameHtml=isEliminated
+      ?`<span style="text-decoration:line-through;color:#aaa">${p.name}</span><span style="font-size:10px;background:#ccc;color:#666;border-radius:6px;padding:1px 5px;margin-left:4px;font-weight:500">탈락</span>`
+      :`<span>${p.name}</span>`;
 
-    html+=`<div class="d-card" style="border-color:${cardBorder}">
-      <div class="d-name"><span>${p.name}</span><span style="color:${color};font-size:11px;font-weight:600">${done}/20개</span></div>
+    html+=`<div class="d-card" style="border-color:${cardBorder};${cardStyle}">
+      <div class="d-name">${nameHtml}<span style="color:${color};font-size:11px;font-weight:600">${done}/20개</span></div>
       <div style="height:4px;background:#eef0f3;border-radius:2px;margin-bottom:8px"><div style="height:100%;width:${pc}%;background:${color};border-radius:2px"></div></div>
       <div class="dot-row" style="margin-bottom:8px">`;
     p.weeks.forEach((w,wi)=>{
@@ -344,7 +367,9 @@ function renderPersonal(){
       }
     });
     html+=`</div><div style="display:flex;gap:12px;font-size:11px;color:#888"><span>팔로워 ${flHtml}</span><span>좋아요+저장 ${engHtml}</span></div></div>`;
-  });
+  };
+  sorted.forEach(p=>renderCard(p,false));
+  eliminatedData.forEach(p=>renderCard(p,true));
   html+='</div>';
   document.getElementById('tab-personal').innerHTML=html;
 }
@@ -353,7 +378,7 @@ let chartObjs=[];
 function renderStats(){
   const colors=['#1D9E75','#3266ad','#EF9F27','#E24B4A','#7F77DD','#D85A30','#D4537E','#639922','#BA7517','#0F6E56','#185FA5','#993556','#3B6D11','#854F0B','#533AAA','#2E86AB'];
   const wLabels=WEEKS.map(w=>w.label);
-  const active=DATA.filter(p=>p.weeks.some(w=>w.uploads!==null));
+  const active=DATA.filter(p=>!p.eliminated&&p.weeks.some(w=>w.uploads!==null));
   if(!active.length){
     document.getElementById('tab-stats').innerHTML='<div class="empty-box">아직 입력된 데이터가 없어요.<br>운영진이 (대시보드DB) 탭에 데이터를 입력하면 차트가 표시됩니다.</div>';return;
   }

@@ -112,7 +112,7 @@ const WEEKS=[
 ];
 const PPW=5;
 const EXCLUDED_NAMES=['김혜원'];
-const ELIMINATED_NAMES=['최은진(9405)'];
+const ELIMINATED_NAMES=['최은진(9405)','이한나래'];
 
 function getCurWeek(){
   const today=new Date();today.setHours(0,0,0,0);
@@ -127,17 +127,13 @@ function totalPct(p){return Math.round(totalDone(p)/20*100);}
 function curWeekUploads(p){const u=p.weeks[CUR_WEEK].uploads;return u===null?0:u;}
 function curWeekDone(p){return curWeekUploads(p)>=PPW;}
 
-// ── 누적 페이스 타겟 계산 (평일 기준) ──────────────────────────────
-// 프로그램 시작일(1주차 월요일)부터 오늘까지 지난 평일(월~금) 수로 계산
-// 토/일은 보충일이므로 카운트 제외
-// 예: 2주차 월요일(4/20) → 평일 6일 → paceTarget = 6건
 function calcPaceTarget(){
   const today=new Date();today.setHours(0,0,0,0);
   const programStart=WEEKS[0].start;
   let weekdayCount=0;
   let d=new Date(programStart);
   while(d<=today){
-    const dow=d.getDay(); // 0=일, 6=토
+    const dow=d.getDay();
     if(dow!==0&&dow!==6)weekdayCount++;
     d.setDate(d.getDate()+1);
   }
@@ -145,9 +141,6 @@ function calcPaceTarget(){
   return Math.min(weekdayCount,maxSoFar);
 }
 
-// ── 색깔 계산: 페이스 통과 = 초록, 미달자 내 상대평가로 주황/빨강 ──
-// 페이스 통과(totalDone >= paceTarget) → 초록
-// 미달자 중 상위 60% → 주황, 하위 40% → 빨강
 function calcRelativeColors(dataArr){
   const n=dataArr.length;
   if(!n)return{};
@@ -236,13 +229,10 @@ function renderOverview(){
   const eliminatedData=DATA.filter(p=>p.eliminated);
   const colorMap=calcRelativeColors(activeData);
 
-  // ── 수정된 페이스 타겟: 누적 기준 ──
   const paceTarget=calcPaceTarget();
 
-  // 우수 참가자: 누적 업로드 수 >= 누적 페이스 타겟
   const goodList=activeData.filter(p=>totalDone(p)>=paceTarget);
 
-  // 필요 참가자: 누적 업로드 수 < 누적 페이스 타겟, 업로드 적은 순 정렬
   const missSorted=[...activeData.filter(p=>totalDone(p)<paceTarget)]
     .sort((a,b)=>totalDone(a)-totalDone(b));
 
